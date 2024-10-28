@@ -1,0 +1,35 @@
+---
+- name: bandwidth
+  #command: uapi --user="{{ domain_user_data.data.userdata.user }}" Bandwidth query grouping=domain%7Cyear_month_day%7Cprotocol protocols=http%7Cftp timezone=America%2FSao_Paulo --output=json
+  command: whmapi1 showbw searchtype=user search=^"{{ domain_user_data.data.userdata.user }}"$ --output=json
+  register: bandwidth_temp
+
+- set_fact:
+    bandwidth: "{{ bandwidth_temp.stdout | from_json }}"
+  when: bandwidth_temp.failed == False
+
+- set_fact:
+    file_bandwidth: "{{ report_directory }}/bandwidth_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: bandwidth.metadata.result != 0
+
+- name: stat report file bandwidth
+  stat:
+    path: "{{ file_bandwidth }}"
+  register: stat_report_file_bandwidth
+  when: bandwidth.metadata.result != 0
+
+- name: report file bandwidth
+  file:
+    path: "{{ file_bandwidth }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_bandwidth.stat.exists else "touch" }}'
+  when: bandwidth.metadata.result != 0
+
+- name: save file bandwidth
+  lineinfile:
+    path: "{{ file_bandwidth }}"
+    line: "{{ bandwidth | to_json }}"
+    state: present
+  when: bandwidth.metadata.result != 0

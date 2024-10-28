@@ -1,0 +1,181 @@
+---
+- name: struture of exception errors
+  block:
+    - name: scan parameters and report directory fact
+      set_fact:
+        scan_params: "-i -r --no-summary --max-recursion=10 --max-dir-recursion=10 --exclude='(error_log|access_log)' --exclude-dir='(access-logs|mail|awstats|webalizer|analog|.security|cpbandwidth|webalizerftp|MYSQL_DATA|cpeasyapache|virtfs|.trash)' --max-filesize=3M --scan-mail=no --scan-pe=no --scan-archive=no --cross-fs=no --bytecode-timeout=5 --phishing-sigs=no --phishing-scan-urls=no --scan-ole2=no --scan-pdf=no --block-encrypted=yes"
+        report_directory: "/root/tmp/.abuse_{{ domain }}_{{ ticket_id }}_{{ thread_id }}"
+        local_path_phishing: "/opt/abuse/sigs/phishing.ndb"
+        local_path_malware: "/opt/abuse/sigs/malware.ndb"
+        local_path_clamav: "/opt/abuse/sigs/clamav-64bit.tar.gz"
+
+    - name: scan files report
+      set_fact:
+        report_file_phishing: "{{ report_directory }}/scan_phishing_{{ domain }}_{{ ticket_id }}_{{ thread_id }}"
+        report_file_malware: "{{ report_directory }}/scan_malware_{{ domain }}_{{ ticket_id }}_{{ thread_id }}"
+
+    - set_fact:
+        local_report_dir: "/opt/abuse/reports/{{ domain }}_{{ ticket_id }}_{{ thread_id }}"
+      when: local_report_dir is not defined
+
+    - name: set all scan
+      set_fact:
+        scan_phishing: True
+        scan_malware: True
+      when: scanAll is defined and scanAll
+
+    - name: report directory
+      file:
+        path: "{{ report_directory }}"
+        state: directory
+        owner: root
+        group: root
+        mode: 0600
+
+    - name: stat report file phishing
+      stat:
+        path: "{{ report_file_phishing }}"
+      register: stat_report_file_phishing
+      when: scan_phishing is defined and scan_phishing
+
+    - name: report file
+      file:
+        path: "{{ report_file_phishing }}"
+        owner: root
+        group: root
+        mode: 0600
+        state: '{{ "file" if stat_report_file_phishing.stat.exists else "touch" }}'
+      when: scan_phishing is defined and scan_phishing
+
+    - name: stat report file malware
+      stat:
+        path: "{{ report_file_malware }}"
+      register: stat_report_file_malware
+      when: scan_malware is defined and scan_malware
+
+    - name: report file
+      file:
+        path: "{{ report_file_malware }}"
+        owner: root
+        group: root
+        mode: 0600
+        state: '{{ "file" if stat_report_file_malware.stat.exists else "touch" }}'
+      when: scan_malware is defined and scan_malware
+
+    - name: check local clamav
+      local_action: stat path="{{ local_path_clamav }}"
+      register: statBinaryClamav
+      when: (scan_malware is defined and scan_malware) or (scan_phishing is defined and scan_phishing)
+
+    - name: check local sigs phishing
+      local_action: stat path="{{ local_path_phishing }}"
+      register: stat_sigs_phishing
+      when: scan_phishing is defined and scan_phishing
+
+    - name: check local sigs malware
+      local_action: stat path="{{ local_path_malware }}"
+      register: stat_sigs_malware
+      when: scan_malware is defined and scan_malware
+
+    - name: copy binary clamav
+      copy:
+        src: "{{ local_path_clamav }}"
+        dest: "{{ report_directory }}/clamav-64bit.tar.gz"
+        owner: root
+        group: root
+        mode: 0600
+        checksum: "{{ statBinaryClamav.stat.checksum }}"
+      when: (scan_malware is defined and scan_malware) or (scan_phishing is defined and scan_phishing)
+      register: copy_binary_clamav
+
+    - name: copy sigs phishing
+      copy:
+        src: "{{ local_path_phishing }}"
+        dest: "{{ report_directory }}/phishing.ndb"
+        owner: root
+        group: root
+        mode: 0600
+        checksum: "{{ stat_sigs_phishing.stat.checksum }}"
+      when: scan_phishing is defined and scan_phishing
+      register: copy_phishing
+
+    - name: copy sigs malware
+      copy:
+        src: "{{ local_path_malware }}"
+        dest: "{{ report_directory }}/malware.ndb"
+        owner: root
+        group: root
+        mode: 0600
+        checksum: "{{ stat_sigs_malware.stat.checksum }}"
+      when: scan_malware is defined and scan_malware
+      register: copyMalware
+
+    - name: Extract binary clamav
+      unarchive:
+        src: "{{ report_directory }}/clamav-64bit.tar.gz"
+        dest: "{{ report_directory }}"
+        owner: root
+        group: root
+        mode: 0600
+        remote_src: yes
+      when: copy_binary_clamav is defined and copy_binary_clamav.failed == False and ((scan_malware is defined and scan_malware) or (scan_phishing is defined and scan_phishing))
+      register: extract_clamav
+
+    - name: Change permission clamscan
+      file:
+        path: "{{ report_directory }}/clamav/bin/clamscan"
+        owner: root
+        group: root
+        mode: 0700
+      when: extract_clamav is defined and extract_clamav.failed == False and ((scan_malware is defined and scan_malware) or (scan_phishing is defined and scan_phishing))
+
+    - name: scan check phishing
+      command: clamscan {{ scan_params }} "{{ path_scan }}" -d {{ copy_phishing.dest }}
+      environment:
+        PATH: "{{ report_directory }}/clamav/bin"
+        LD_LIBRARY_PATH: "{{ report_directory }}/clamav/lib64"
+      when: extract_clamav is defined and extract_clamav.failed == False and scan_phishing is defined and scan_phishing
+      ignore_errors: yes
+      register: result_scan_phishing
+      failed_when: result_scan_phishing.rc != 1 and result_scan_phishing.rc != 0
+
+    - name: scan check malware
+      command: clamscan {{ scan_params }} "{{ path_scan }}" -d {{ copyMalware.dest }}
+      environment:
+        PATH: "{{ report_directory }}/clamav/bin"
+        LD_LIBRARY_PATH: "{{ report_directory }}/clamav/lib64"
+      when: extract_clamav is defined and extract_clamav.failed == False and scan_malware is defined and scan_malware
+      ignore_errors: yes
+      register: result_scan_malware
+      failed_when: result_scan_malware.rc != 1 and result_scan_malware.rc != 0
+
+    - name: report directory local
+      local_action: file path="{{ local_report_dir }}" state=directory owner=abuse group=abuse mode=0600
+      when: (scan_malware is defined and scan_malware) or (scan_phishing is defined and scan_phishing)
+
+    - name: scan report phishing
+      local_action: copy content="{{ result_scan_phishing.stdout }}" dest="{{ local_report_dir }}/scan_phishing"
+      when: result_scan_phishing is defined and result_scan_phishing.stdout is defined and scan_phishing is defined and scan_phishing
+
+    - name: scan report malware
+      local_action: copy content="{{ result_scan_malware.stdout }}" dest="{{ local_report_dir }}/scan_malware"
+      when: result_scan_malware is defined and result_scan_malware.stdout is defined and scan_malware is defined and scan_malware
+
+  rescue:
+    - name: check error in domain check
+      local_action: file path="/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/scan_error.flag" state=touch owner=abuse group=abuse mode=0600
+
+  always:
+    - name: remove abuse home directory
+      file:
+        path: "{{ report_directory }}"
+        state: absent
+      when: report_directory is defined
+
+    - name: remove rule accept for  server
+      iptables:
+        state: absent
+        chain: INPUT
+        source: 1.1.1.1
+        jump: ACCEPT
+        comment: "Temporary rule for ansible automation"

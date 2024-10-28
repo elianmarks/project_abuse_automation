@@ -1,0 +1,42 @@
+---
+- name: Check ssh port in server
+  wait_for:
+    port: "22"
+    state: "started"
+    host: "{{ inventory_hostname }}"
+    connect_timeout: "10"
+    timeout: "10"
+  delegate_to: "localhost"
+  ignore_errors: "yes"
+  register: default_ssh_port
+
+- name: Check alternative ssh port in server
+  wait_for:
+    port: "22022"
+    state: "started"
+    host: "{{ inventory_hostname }}"
+    connect_timeout: "10"
+    timeout: "10"
+  delegate_to: "localhost"
+  ignore_errors: "yes"
+  register: alternative_ssh_port
+  when: default_ssh_port is defined and default_ssh_port.failed == True
+
+- name: set default port ssh
+  set_fact:
+    ansible_port: "22"
+  when: default_ssh_port is defined and default_ssh_port.failed == False and default_ssh_port.state is defined and default_ssh_port.state == "started"
+
+- name: set alternative port ssh
+  set_fact:
+    ansible_port: "22022"
+  when: alternative_ssh_port is defined and alternative_ssh_port.skipped is not defined and alternative_ssh_port.failed == False and alternative_ssh_port.state is defined and alternative_ssh_port.state == "started"
+
+- name: insert rule accept for  server
+  iptables:
+    action: insert
+    chain: INPUT
+    source: 1.1.1.1
+    jump: ACCEPT
+    comment: "Temporary rule for ansible automation"
+  when: ansible_port is defined

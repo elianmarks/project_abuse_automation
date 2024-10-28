@@ -1,0 +1,12 @@
+[Unit]
+Description=Abuse Main Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/abuse/bin/pythonAbuse /opt/abuse/bin/abuse.py
+StandardOutput=journal+console
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target

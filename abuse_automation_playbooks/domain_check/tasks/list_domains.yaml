@@ -1,0 +1,34 @@
+---
+- name: list domains
+  command: uapi --user="{{ domain_user_data.data.userdata.user }}" DomainInfo list_domains --output=json
+  register: list_domains_temp
+
+- set_fact:
+    list_domains: "{{ list_domains_temp.stdout | from_json }}"
+  when: list_domains_temp.failed == False
+
+- set_fact:
+    file_list_domains: "{{ report_directory }}/list_domains_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: list_domains.result.status == 1
+
+- name: stat report file list domains
+  stat:
+    path: "{{ file_list_domains }}"
+  register: stat_report_file_list_domains
+  when: list_domains.result.status == 1
+
+- name: report file list domains
+  file:
+    path: "{{ file_list_domains }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_list_domains.stat.exists else "touch" }}'
+  when: list_domains.result.status == 1
+
+- name: save file list domains
+  lineinfile:
+    path: "{{ file_list_domains }}"
+    line: "{{ list_domains | to_json }}"
+    state: present
+  when: list_domains.result.status == 1

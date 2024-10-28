@@ -1,0 +1,64 @@
+---
+- name: structure of exception errors
+  block:
+    - name: set default values
+      set_fact:
+        check_unlock: False
+        pw_user: False
+        pw_password: False
+        pw_already_enabled: False
+
+    - name: pwrestrict block directory
+      shell: "pwrestrict"
+      args:
+        chdir: "{{ directory }}"
+      register: result_block
+      when: directory is defined and pw_block is defined and pw_block and type_block is defined and type_block == "pwrestrict"
+
+    - name: pwrestrict unblock directory
+      shell: "pwrestrict -r"
+      args:
+        chdir: "{{ directory }}"
+      register: result_unblock
+      when: directory is defined and pw_unblock is defined and pw_unblock and type_block is defined and type_block == "pwrestrict"
+
+    - name: result pwrestrict user
+      set_fact:
+        pw_user: "{{ result_block.stdout | regex_search('User: [a-z0-9]+', ignorecase=True) |  regex_replace('User: ', '') }}"
+      when: directory is defined and pw_block is defined and pw_block and type_block is defined and type_block == "pwrestrict" and result_block.stdout | regex_search('enabling password protection on directory', ignorecase=True) != None
+
+    - name: result pwrestrict password
+      set_fact:
+        pw_password: "{{ result_block.stdout | regex_search('Password: [a-z0-9]+', ignorecase=True) |  regex_replace('Password: ', '') }}"
+      when: directory is defined and pw_block is defined and pw_block and type_block is defined and type_block == "pwrestrict" and result_block.stdout | regex_search('enabling password protection on directory', ignorecase=True) != None
+
+    - name: result pwrestrict check
+      set_fact:
+        pw_already_enabled: True
+      when: directory is defined and pw_block is defined and pw_block and type_block is defined and type_block == "pwrestrict" and result_block.stdout | regex_search('password protection appears to be already enabled', ignorecase=True) != None
+
+    - name: check result pwrestrict unblock
+      set_fact:
+        check_unlock: True
+      when: directory is defined and pw_unblock is defined and pw_unblock and type_block is defined and type_block == "pwrestrict" and result_unblock.stdout | regex_search('Disabling password protection for user', ignorecase=True) != None
+
+    - name: report result in specific file
+      local_action: copy content="{{ pw_user }},{{ pw_password }},{{ check_unlock }},{{ pw_already_enabled }}" dest="/opt/abuse/action/{{ thread_id }}" owner=abuse group=abuse mode=0600
+      when: thread_id is defined and path is not defined
+
+    - name: report result in default file
+      local_action: copy content="{{ pw_user }},{{ pw_password }},{{ check_unlock }},{{ pw_already_enabled }}" dest="/opt/abuse/action/block_execute" owner=abuse group=abuse mode=0600
+      when: thread_id is not defined and path is not defined
+
+    - name: report result in path file
+      local_action: copy content="{{ pw_user }},{{ pw_password }},{{ check_unlock }},{{ pw_already_enabled }}" dest="{{ path }}"
+      when: path is defined
+
+  always:
+    - name: remove rule accept for  server
+      iptables:
+        state: absent
+        chain: INPUT
+        source: 1.1.1.1
+        jump: ACCEPT
+        comment: "Temporary rule for ansible automation"

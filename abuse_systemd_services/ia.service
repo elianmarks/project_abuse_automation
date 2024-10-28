@@ -1,0 +1,13 @@
+[Unit]
+Description=Abuse IA Service
+After=network.target
+
+[Service]
+Environment=ANSIBLE_LOG_PATH=/opt/abuse/logs/ia/abuse_ia_ansible.log
+Type=simple
+ExecStart=/opt/abuse/bin/pythonAbuse /opt/abuse/bin/ia.py
+StandardOutput=journal+console
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target

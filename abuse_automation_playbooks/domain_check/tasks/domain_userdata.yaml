@@ -1,0 +1,70 @@
+---
+- name: domain user data
+  command: whmapi1 domainuserdata domain="{{ domain }}" --output=json
+  register: domain_user_data_temp
+
+- set_fact:
+    domain_user_data: "{{ domain_user_data_temp.stdout | from_json }}"
+  when: domain_user_data_temp.failed == False
+
+- set_fact:
+    report_directory: "/root/tmp/.abuse_{{ domain }}_{{ ticket_id }}_{{ thread_id }}"
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- set_fact:
+    report_file: "{{ report_directory }}/report_{{ domain }}_{{ ticket_id }}_{{ thread_id }}"
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- name: report directory
+  file:
+    path: "{{ report_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0600
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- name: report directory local
+  local_action: file path="/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}" state=directory owner=abuse group=abuse mode=0600
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- name: stat report file
+  stat:
+    path: "{{ report_file }}"
+  register: stat_report_file
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- name: report file
+  file:
+    path: "{{ report_file }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file.stat.exists else "touch" }}'
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- set_fact:
+    file_domain_user_data: "{{ report_directory }}/domain_user_data_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- name: stat report file domain user data
+  stat:
+    path: "{{ file_domain_user_data }}"
+  register: stat_report_file_domain_user_data
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- name: report file domain user data
+  file:
+    path: "{{ file_domain_user_data }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_domain_user_data.stat.exists else "touch" }}'
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0
+
+- name: save file domain user data
+  lineinfile:
+    path: "{{ file_domain_user_data }}"
+    line: "{{ domain_user_data | to_json }}"
+    state: present
+  when: domain_user_data is defined and domain_user_data.metadata.result != 0

@@ -1,0 +1,9 @@
+---
+- name: Executing phishing check
+  hosts: all
+  gather_facts: false
+  environment:
+    PATH: /root/bin:/scripts:/usr/bin:/bin:/usr/sbin:/sbin
+  roles:
+    - check_ssh
+    - scan_check

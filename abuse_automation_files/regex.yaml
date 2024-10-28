@@ -1,0 +1,83 @@
+---
+regex:
+  check:
+    - ((((h[t|x][t|x]ps?))(:\/\/)?)?(w{0,3}\.)?(([a-z0-9_~\-@]|\.)+) ?\. ?(([a-z0-9_~\-@]| ?\. ?)+)(\/(([a-z0-9;_~\-@\.\=\&\?\!\%]|\/))+)?)
+  malware:
+    - (malware(?!score|@)([a-z0-9 ]+)?)
+  phishing:
+    - ((phishing(?!score|@)([a-z0-9 ]+)?)|(phish(?!score|@|ing)([a-z0-9 ]+)?)|(fake website)|(get confidential private information))
+  replaces:
+    - <space>?\[<space>?\.<space>?\]<space>?|<space>?\(<space>?\.<space>?\)<space>?|<space>?\[<space>?dot<space>?\]<space>?|<space>?\(<space>?dot<space>?\)<space>? .
+    - \\\. .
+    - hxxps://<space>? https://
+    - hxxp://<space>? http://
+    - <space>\.<space> .
+    - <space>\. .
+    - \.<space> .
+    - <space>dot<space> .
+    - <space>/<space> /
+    - <space>/ /
+    - /<space> /
+  excludes:
+    - (incident)?(www)?\.@?netcraft\.com
+    - (tools\.)?@?ietf\.org
+    - (www\.)?@?xarf\.org
+    - (www\.)?(dnsbl)?(www)?\.?@?manitu\.net
+    - (www\.)?@?abusix\.com
+    - (www\.)?@?bluehost\.com
+    - (www\.)?@?spamcop\.net
+    - (www\.)?(urlhaus\.)?@?abuse\.ch
+    - (www\.)?(tickets\.)?(financeiro\.)?(support\.)?(supportdesk\.)?@?example\.com(\.br)?
+    - web[0-9]+\.example\.com
+    - gateway[0-9]+\.example\.com
+    - cm[0-9]+\.example\.com
+    - virtual[0-9]+\.example\.com\.br
+    - (br|bz|mx)[0-9]{1,4}\.example\.(com\.br|com\.mx|mx|com\.cl|cl|com\.co|co)
+    - (br|bz|mx)[0-9]{1,4}-ip[-0-9\.]+\.example\.(com\.br|com\.mx|mx|com\.cl|cl|com\.co|co)
+    - (srv|server)[0-9]{1,4}\.example\.(com\.br|com\.mx|mx|com\.cl|cl|com\.co|co)
+    - (srv|server)[0-9]{1,4}-ip[-0-9\.]+\.example\.(com\.br|com\.mx|mx|com\.cl|cl|com\.co|co)
+    - server[0-9]{1,4}\.example\.(com\.br|com\.mx|mx|com\.cl|cl|com\.co|co)
+    - server[0-9]{1,4}-ip[-0-9\.]+\.example\.(com\.br|com\.mx|mx|com\.cl|cl|com\.co|co)
+    - (www\.)?@?example\.com
+    - (www\.)?(doc\.)?@?bitninja\.io
+    - (www\.)?(rwhois\.)?@?example\.com
+    - (www\.)?@?(irt\.)?riskiq\.com
+    - (www\.)?@?(irt\.)?riskiq\.net
+    - (www\.)?@?virtustotal\.com
+    - (www\.)?@?cert\.br
+    - (www\.)?@?nic\.br
+    - (www\.)?(sbl\.)?@?spamhaus\.org
+    - (www\.)?@?maileig\.com
+    - (www\.)?@?example\.com
+    - (www\.)?@?markmonitor\.com
+    - (www\.)?@?axur\.com
+    - (www\.)?(whois\.)?(rdap\.)?@?arin\.net
+    - (www\.)?@?tempest\.com(\.br)?
+    - (www\.)?(support\.)?@?arvixe\.com(\.br)?
+    - (www\.)?@?terra\.com(\.br)?
+    - (www\.)?@?tempestsi\.com(\.br)?
+  ipexcludes:
+    - 1.1.1.1
+  match:
+    - (example|example02)\.(com\.br|com\.mx|mx|com\.co|co|com\.cl|cl)
+  matchspf:
+    - examplespf
+  ftpupload:
+    - notice\] [0-9a-z\&\/\-\. _\(\)]+ uploaded
+  cpanelfml:
+    - ((extract|savefile) [0-9a-z\&\/\-\. _\(\)]+ \()
+  cpanel:
+    - (json\-api|filemanager|upload\-ajax|fileman|upload_files|editit\.html)
+  apacheexcludes:
+    - wp\-cron
+  apachewp:
+    - POST \/([a-z0-9\-_\/]+)?(wp\-|xmlrpc)
+  wordlist:
+    - americanas(\.com\.br)?
+    - magazineluiza(\.com\.br)?
+    - (banco do brasil|bancodobrasil)(\.com\.br)?
+    - bb\.com\.br
+    - (casas bahia|casasbahia)(\.com\.br)?
+    - (itau|itaú)(\.com\.br)?
+    - (mercado livre|mercadolibre|mercadolivre)(\.com\.?([a-z]{2})?)?
+    - carrefour(\.com\.?([a-z]{2})?)?

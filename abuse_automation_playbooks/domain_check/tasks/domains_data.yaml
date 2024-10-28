@@ -1,0 +1,34 @@
+---
+- name: domains data
+  command: uapi --user="{{ domain_user_data.data.userdata.user }}" DomainInfo domains_data format=hash return_https_redirect_status=1 --output=json
+  register: domains_data
+
+- set_fact:
+    domains_data: "{{ domains_data.stdout | from_json }}"
+  when: domains_data.failed == False
+
+- set_fact:
+    file_domains_data: "{{ report_directory }}/domains_data_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: domains_data.result.status == 1
+
+- name: stat report file domains data
+  stat:
+    path: "{{ file_domains_data }}"
+  register: stat_report_file_domains_data
+  when: domains_data.result.status == 1
+
+- name: report file domains data
+  file:
+    path: "{{ file_domains_data }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_domains_data.stat.exists else "touch" }}'
+  when: domains_data.result.status == 1
+
+- name: save file domains data
+  lineinfile:
+    path: "{{ file_domains_data }}"
+    line: "{{ domains_data | to_json }}"
+    state: present
+  when: domains_data.result.status == 1

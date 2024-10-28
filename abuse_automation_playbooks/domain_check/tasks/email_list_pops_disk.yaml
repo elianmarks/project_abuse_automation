@@ -1,0 +1,34 @@
+---
+- name: email list pops disk
+  command: uapi --user="{{ domain_user_data.data.userdata.user }}" Email list_pops_with_disk --output=json
+  register: email_list_pops_disk_temp
+
+- set_fact:
+    email_list_pops_disk: "{{ email_list_pops_disk_temp.stdout | from_json }}"
+  when: email_list_pops_disk_temp.failed == False
+
+- set_fact:
+    file_email_list_pops_disk: "{{ report_directory }}/email_list_pops_disk_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: email_list_pops_disk.result.status == 1
+
+- name: stat report file email list pops disk
+  stat:
+    path: "{{ file_email_list_pops_disk }}"
+  register: stat_report_file_email_list_pops_disk
+  when: email_list_pops_disk.result.status == 1
+
+- name: report file email list pops disk
+  file:
+    path: "{{ file_email_list_pops_disk }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_email_list_pops_disk.stat.exists else "touch" }}'
+  when: email_list_pops_disk.result.status == 1
+
+- name: save file email list pops disk
+  lineinfile:
+    path: "{{ file_email_list_pops_disk }}"
+    line: "{{ email_list_pops_disk | to_json }}"
+    state: present
+  when: email_list_pops_disk.result.status == 1

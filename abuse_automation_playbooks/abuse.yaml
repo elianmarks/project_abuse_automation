@@ -1,0 +1,6 @@
+---
+- name: Upload reports to abuse server
+  hosts: all
+  gather_facts: false
+  roles:
+    - abuse_upload

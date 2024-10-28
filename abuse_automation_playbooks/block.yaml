@@ -1,0 +1,9 @@
+---
+- name: Executing block playbook
+  hosts: all
+  gather_facts: false
+  environment:
+    PATH: /root/bin:/scripts:/usr/bin:/bin:/usr/sbin:/sbin
+  roles:
+    - check_ssh
+    - block_execute

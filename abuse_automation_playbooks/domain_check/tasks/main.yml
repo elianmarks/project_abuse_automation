@@ -1,0 +1,213 @@
+---
+- name: structure of exception errors
+  block:
+    - name: get domain when user set
+      command: whmapi1 accountsummary user="{{ user }}" --output=json
+      register: get_domain_temp
+      when: user is defined
+
+    - set_fact:
+        get_domain: "{{ get_domain_temp.stdout | from_json  }}"
+      when: user is defined
+
+    - set_fact:
+        domain: "{{ get_domain.data.acct[0].domain }}"
+      when: user is defined and get_domain is defined and get_domain.metadata.result == 1 and get_domain.data.acct | length > 0
+
+    - set_fact:
+        local_report_dir: "{{ user }}"
+      when: user is defined and get_domain is defined and get_domain.metadata.result == 1 and get_domain.data.acct | length > 0
+
+    - set_fact:
+        local_report_dir: "{{ domain }}"
+      when: user is not defined and get_domain is not defined
+
+    - name: tasks whmapi1 domainuserdata
+      import_tasks: domain_userdata.yaml
+      when: domain is defined
+
+    - name: tasks whmapi1 accountsummary
+      import_tasks: account_summary.yaml
+      when: domain is defined
+
+    - name: tasks whmapi1 list_mysql_databases
+      import_tasks: mysql_databases.yaml
+      when: domain is defined
+
+    - name: tasks uapi list_domains
+      import_tasks: list_domains.yaml
+      when: domain is defined
+
+    - name: tasks uapi bandwidth
+      import_tasks: bandwidth.yaml
+      when: domain is defined
+
+    - name: tasks uapi domains data
+      import_tasks: domains_data.yaml
+      when: domain is defined
+
+    - name: tasks uapi email account disk
+      import_tasks: email_account_disk.yaml
+      when: domain is defined
+
+    - name: tasks uapi email list mxs
+      import_tasks: email_list_mxs.yaml
+      when: domain is defined
+
+    - name: tasks uapi list pops disk
+      import_tasks: email_list_pops_disk.yaml
+      when: domain is defined
+
+    - name: tasks uapi list ftp disk
+      import_tasks: list_ftp_disk.yaml
+      when: domain is defined
+
+    - name: tasks uapi last login
+      import_tasks: last_login.yaml
+      when: domain is defined
+
+    - name: cms check
+      command: vdetect --user "{{ domain_user_data.data.userdata.user }}" --json
+      register: cms_check
+      when: domain is defined
+      ignore_errors: yes
+
+    - name: option cms false
+      lineinfile:
+        path: "{{ report_file }}"
+        line: "cmsFalse"
+        state: present
+      when: domain is defined and cms_check.stdout == "[]"
+
+    - name: cms process
+      lineinfile:
+        path: "{{ report_file }}"
+        line: "cmsTrue={{ item | join(',') }}"
+      with_items:
+        - "{{ cms_check.stdout }}"
+      when: domain is defined and cms_check.stdout != "[]" and cms_check.stdout | regex_search('wordpress|joomla|magento|drupal', ignorecase=True) != None and item | join(',') is regex('^(0|2|-1).*(wordpress|joomla|magento|drupal).*', ignorecase=True)
+
+    - name: hf check
+      shell: hf -r 120 -n 10 -u "{{ domain_user_data.data.userdata.user }}" -j "{{ domain_user_data.data.userdata.documentroot }}{{ file_url  }}"
+      args:
+        chdir: "{{ domain_user_data.data.userdata.homedir }}"
+      register: hf_check
+      when: domain is defined and file_url is defined
+      ignore_errors: yes
+
+    - name: hf report
+      lineinfile:
+        path: "{{ report_file }}"
+        line: hf={{ hf_check.stdout }}
+      when: domain is defined and file_url is defined and hf_check is defined and hf_check.stderr is defined and "file does not exist" not in hf_check.stderr
+
+    - name: upload report file
+      fetch:
+        src: "{{ report_file }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/report"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file bandwidth
+      fetch:
+        src: "{{ file_bandwidth }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/bandwidth.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file account summary
+      fetch:
+        src: "{{ file_account_summary }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/account_summary.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file domain user data
+      fetch:
+        src: "{{ file_domain_user_data }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/domain_user_data.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file domains data
+      fetch:
+        src: "{{ file_domains_data }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/domains_data.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file email account disk
+      fetch:
+        src: "{{ file_email_account_disk }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/email_account_disk.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file email list mxs
+      fetch:
+        src: "{{ file_email_list_mxs }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/email_list_mxs.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file email list pops disk
+      fetch:
+        src: "{{ file_email_list_pops_disk }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/list_pops_disk.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file last login
+      fetch:
+        src: "{{ file_last_login }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/last_login.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file list domains
+      fetch:
+        src: "{{ file_list_domains }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/list_domains.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file list ftp disk
+      fetch:
+        src: "{{ file_list_ftp_disk }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/list_ftp_disk.json"
+        flat: yes
+      when: domain is defined
+
+    - name: upload report file mysql databases
+      fetch:
+        src: "{{ file_mysql_databases }}"
+        dest: "/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/mysql_databases.json"
+        flat: yes
+      when: domain is defined
+
+    - name: get hostname of the server
+      command: hostname
+      register: get_hostname
+
+    - name: save file with hostname
+      local_action: copy content="{{ get_hostname.stdout }}" dest="/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/hostname" owner=abuse group=abuse mode=0600
+      when: domain is defined
+
+  rescue:
+    - name: check error in domain check
+      local_action: file path="/opt/abuse/reports/{{ local_report_dir }}_{{ ticket_id }}_{{ thread_id }}/check_error.flag" state=touch owner=abuse group=abuse mode=0600
+
+  always:
+    - name: remove abuse home directory
+      file:
+        path: "{{ report_directory }}"
+        state: absent
+      when: report_directory is defined
+
+    - name: remove rule accept for  server
+      iptables:
+        state: absent
+        chain: INPUT
+        source: 1.1.1.1
+        jump: ACCEPT
+        comment: "Temporary rule for ansible automation"

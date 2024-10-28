@@ -1,0 +1,69 @@
+---
+- name: account summary
+  command: whmapi1 accountsummary user="{{ domain_user_data.data.userdata.user }}" --output=json
+  register: account_summary_temp
+
+- set_fact:
+    account_summary: "{{ account_summary_temp.stdout | from_json }}"
+  when: account_summary_temp.failed == False
+
+- set_fact:
+    file_account_summary: "{{ report_directory }}/account_summary_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: account_summary.metadata.result != 0
+
+- set_fact:
+    file_account_summary_owner: "{{ report_directory }}/account_summary_owner_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: account_summary.metadata.result != 0 and account_summary.data.acct[0].owner != "root"
+
+- name: account summary of the owner
+  command: whmapi1 accountsummary user="{{ account_summary.data.acct[0].owner }}" --output=json
+  register: account_summary_owner_temp
+  when: account_summary.metadata.result != 0 and account_summary.data.acct[0].owner != "root"
+
+- set_fact:
+    account_summary_owner: "{{ account_summary_owner_temp.stdout | from_json }}"
+  when: account_summary.metadata.result != 0 and account_summary.data.acct[0].owner != "root" and account_summary_owner_temp.skipped is not defined and account_summary_owner_temp.failed == False and account_summary.data.acct[0].owner != "root"
+
+- name: stat report file account summary
+  stat:
+    path: "{{ file_account_summary }}"
+  register: stat_report_file_account_summary
+  when: account_summary.metadata.result != 0
+
+- name: report file account summary
+  file:
+    path: "{{ file_account_summary }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_account_summary.stat.exists else "touch" }}'
+  when: account_summary.metadata.result != 0
+
+- name: save file account summary
+  lineinfile:
+    path: "{{ file_account_summary }}"
+    line: "{{ account_summary | to_json }}"
+    state: present
+  when: account_summary.metadata.result != 0
+
+- name: stat report file account summary owner
+  stat:
+    path: "{{ file_account_summary_owner }}"
+  register: stat_report_file_account_summary_owner
+  when: account_summary_owner is defined and account_summary_owner.metadata.result != 0 and account_summary.data.acct[0].owner != "root"
+
+- name: report file account summary owner
+  file:
+    path: "{{ file_account_summary_owner }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_account_summary_owner.stat.exists else "touch" }}'
+  when: account_summary_owner is defined and account_summary_owner.metadata.result != 0 and account_summary.data.acct[0].owner != "root"
+
+- name: save file account summary owner
+  lineinfile:
+    path: "{{ file_account_summary_owner }}"
+    line: "{{ account_summary_owner | to_json }}"
+    state: present
+  when: account_summary_owner is defined and account_summary_owner.metadata.result != 0 and account_summary.data.acct[0].owner != "root"

@@ -1,0 +1,34 @@
+---
+- name: email list mxs
+  command: uapi --user="{{ domain_user_data.data.userdata.user }}" Email list_mxs --output=json
+  register: email_list_mxs_temp
+
+- set_fact:
+    email_list_mxs: "{{ email_list_mxs_temp.stdout | from_json }}"
+  when: email_list_mxs_temp.failed == False
+
+- set_fact:
+    file_email_list_mxs: "{{ report_directory }}/email_list_mxs_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: email_list_mxs.result.status == 1
+
+- name: stat report file email list mxs
+  stat:
+    path: "{{ file_email_list_mxs }}"
+  register: stat_report_file_email_list_mxs
+  when: email_list_mxs.result.status == 1
+
+- name: report file email list mxs
+  file:
+    path: "{{ file_email_list_mxs }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_email_list_mxs.stat.exists else "touch" }}'
+  when: email_list_mxs.result.status == 1
+
+- name: save file email list mxs
+  lineinfile:
+    path: "{{ file_email_list_mxs }}"
+    line: "{{ email_list_mxs | to_json }}"
+    state: present
+  when: email_list_mxs.result.status == 1

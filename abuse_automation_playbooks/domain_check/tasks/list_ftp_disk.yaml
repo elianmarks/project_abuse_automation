@@ -1,0 +1,48 @@
+---
+- name: check etc in home
+  stat:
+    path: "{{ domain_user_data.data.userdata.homedir }}/etc"
+  register: stat_etc_home
+
+- name: create etc in home
+  file:
+    path: "{{ domain_user_data.data.userdata.homedir }}/etc"
+    owner: "{{ domain_user_data.data.userdata.user }}"
+    group: mail
+    mode: 0750
+    state: directory
+  when: stat_etc_home.stat.exists == False
+
+- name: list ftp disk
+  command: uapi --user="{{ domain_user_data.data.userdata.user }}" Ftp list_ftp_with_disk include_acct_types=main --output=json
+  register: list_ftp_disk_temp
+
+- set_fact:
+    list_ftp_disk: "{{ list_ftp_disk_temp.stdout | from_json }}"
+  when: list_ftp_disk_temp.failed == False
+
+- set_fact:
+    file_list_ftp_disk: "{{ report_directory }}/list_ftp_disk_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: list_ftp_disk.result.status == 1
+
+- name: stat report file list ftp disk
+  stat:
+    path: "{{ file_list_ftp_disk }}"
+  register: stat_report_file_list_ftp_disk
+  when: list_ftp_disk.result.status == 1
+
+- name: report file list ftp disk
+  file:
+    path: "{{ file_list_ftp_disk }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_list_ftp_disk.stat.exists else "touch" }}'
+  when: list_ftp_disk.result.status == 1
+
+- name: save file list ftp disk
+  lineinfile:
+    path: "{{ file_list_ftp_disk }}"
+    line: "{{ list_ftp_disk | to_json }}"
+    state: present
+  when: list_ftp_disk.result.status == 1

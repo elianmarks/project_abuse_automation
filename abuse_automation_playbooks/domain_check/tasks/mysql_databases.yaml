@@ -1,0 +1,34 @@
+---
+- name: mysql databases
+  command: whmapi1 list_mysql_databases_and_users user="{{ domain_user_data.data.userdata.user }}" --output=json
+  register: mysql_databases_temp
+
+- set_fact:
+    mysql_databases: "{{ mysql_databases_temp.stdout | from_json }}"
+  when: mysql_databases_temp.failed == False
+
+- set_fact:
+    file_mysql_databases: "{{ report_directory }}/mysql_databases_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: mysql_databases.metadata.result != 0
+
+- name: stat report file mysql databases
+  stat:
+    path: "{{ file_mysql_databases }}"
+  register: stat_report_file_mysql_databases
+  when: mysql_databases.metadata.result != 0
+
+- name: report file mysql databases
+  file:
+    path: "{{ file_mysql_databases }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_mysql_databases.stat.exists else "touch" }}'
+  when: mysql_databases.metadata.result != 0
+
+- name: save file mysql databases
+  lineinfile:
+    path: "{{ file_mysql_databases }}"
+    line: "{{ mysql_databases | to_json }}"
+    state: present
+  when: mysql_databases.metadata.result != 0

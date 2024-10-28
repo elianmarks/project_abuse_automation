@@ -1,0 +1,15 @@
+---
+- set_fact:
+    report_dir: "/opt/abuse/reports/{{ domain }}_{{ ticket_id }}_{{ thread_id }}"
+  when: report_dir is not defined
+
+- name: create report directory in abuse server
+  file:
+    path="{{ report_dir }}" state=directory owner=abuse group=abuse mode=0600
+  when: report_dir is defined
+
+- name: Copy report directory to abuse server
+  copy:
+    src: "{{ report_dir }}"
+    dest: "/opt/abuse/reports/"
+  when: report_dir is defined

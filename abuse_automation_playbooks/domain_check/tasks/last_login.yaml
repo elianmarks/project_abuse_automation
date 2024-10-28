@@ -1,0 +1,34 @@
+---
+- name: last login
+  command: uapi --user="{{ domain_user_data.data.userdata.user }}" LastLogin get_last_or_current_logged_in_ip --output=json
+  register: last_login_temp
+
+- set_fact:
+    last_login: "{{ last_login_temp.stdout | from_json }}"
+  when: last_login_temp.failed == False
+
+- set_fact:
+    file_last_login: "{{ report_directory }}/last_login_{{ domain }}_{{ ticket_id }}_{{ thread_id }}.json"
+  when: last_login.result.status == 1
+
+- name: stat report file last login
+  stat:
+    path: "{{ file_last_login }}"
+  register: stat_report_file_last_login
+  when: last_login.result.status == 1
+
+- name: report file last login
+  file:
+    path: "{{ file_last_login }}"
+    owner: root
+    group: root
+    mode: 0600
+    state: '{{ "file" if stat_report_file_last_login.stat.exists else "touch" }}'
+  when: last_login.result.status == 1
+
+- name: save file last login
+  lineinfile:
+    path: "{{ file_last_login }}"
+    line: "{{ last_login | to_json }}"
+    state: present
+  when: last_login.result.status == 1
